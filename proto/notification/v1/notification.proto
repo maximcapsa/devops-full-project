@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package notification.v1;
+
+import "google/api/annotations.proto";
+
+message Notification {
+  string id = 1;
+  string order_id = 2;
+  string type = 3;
+  string message = 4;
+  string created_at = 5;
+}
+
+message ListNotificationsRequest {
+  string order_id = 1;
+}
+
+message ListNotificationsResponse {
+  repeated Notification notifications = 1;
+}
+
+// NotificationService exposes recorded notifications so the UI can show
+// live order status by polling per order.
+service NotificationService {
+  rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse) {
+    option (google.api.http) = {get: "/v1/orders/{order_id}/notifications"};
+  }
+}

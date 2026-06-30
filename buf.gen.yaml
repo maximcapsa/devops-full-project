@@ -1,6 +1,10 @@
 version: v2
 managed:
   enabled: true
+  # Don't rewrite go_package for the googleapis well-known types — they resolve
+  # to the real google.golang.org/genproto module, not our local gen/.
+  disable:
+    - module: buf.build/googleapis/googleapis
   override:
     - file_option: go_package_prefix
       value: github.com/maximcapsa/devops-full-project/gen

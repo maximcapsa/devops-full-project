@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package inventory.v1;
+
+import "google/api/annotations.proto";
+
+message StockItem {
+  string product_id = 1;
+  int32 available = 2;
+  int32 reserved = 3;
+}
+
+message CheckStockItem {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+message CheckStockRequest {
+  repeated CheckStockItem items = 1;
+}
+
+message CheckStockResponse {
+  bool all_available = 1;
+  repeated StockItem items = 2;
+}
+
+message GetStockRequest {
+  string product_id = 1;
+}
+
+// InventoryService answers stock queries. Stock mutation happens via Kafka
+// consumption of OrderPlaced, not via RPC.
+service InventoryService {
+  rpc CheckStock(CheckStockRequest) returns (CheckStockResponse);
+  rpc GetStock(GetStockRequest) returns (StockItem) {
+    option (google.api.http) = {get: "/v1/stock/{product_id}"};
+  }
+}

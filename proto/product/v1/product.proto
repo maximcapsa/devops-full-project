@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package product.v1;
 
+import "google/api/annotations.proto";
+
 // Product is a single catalog item owned by the product service.
 message Product {
   string id = 1;
@@ -9,4 +11,24 @@ message Product {
   string description = 3;
   int64 price_cents = 4;
   int32 stock = 5;
+}
+
+message ListProductsRequest {}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+}
+
+message GetProductRequest {
+  string id = 1;
+}
+
+// ProductService owns the product catalog.
+service ProductService {
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {
+    option (google.api.http) = {get: "/v1/products"};
+  }
+  rpc GetProduct(GetProductRequest) returns (Product) {
+    option (google.api.http) = {get: "/v1/products/{id}"};
+  }
 }

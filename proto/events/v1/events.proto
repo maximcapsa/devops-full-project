@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Kafka event payloads. Wire format is JSON (protojson encoding of these
+// messages) so events are human-readable with a console consumer while still
+// being schema-defined and type-safe in Go. See README for the rationale.
+//
+// Topics:
+//   orders.placed        -> OrderPlaced
+//   payments.completed   -> PaymentCompleted
+//   payments.failed      -> PaymentFailed
+//   inventory.reserved   -> StockReserved
+//   inventory.rejected   -> StockRejected
+
+message EventItem {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+message OrderPlaced {
+  string order_id = 1;
+  repeated EventItem items = 2;
+  int64 total_cents = 3;
+  google.protobuf.Timestamp occurred_at = 4;
+}
+
+message PaymentCompleted {
+  string order_id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+}
+
+message PaymentFailed {
+  string order_id = 1;
+  string reason = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+}
+
+message StockReserved {
+  string order_id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+}
+
+message StockRejected {
+  string order_id = 1;
+  string reason = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+}

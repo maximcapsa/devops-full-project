@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package order.v1;
+
+import "google/api/annotations.proto";
+
+message OrderItem {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+// Order status values: PENDING, PAID, PAYMENT_FAILED, REJECTED.
+message Order {
+  string id = 1;
+  string status = 2;
+  repeated OrderItem items = 3;
+  int64 total_cents = 4;
+  string created_at = 5;
+}
+
+message PlaceOrderRequest {
+  repeated OrderItem items = 1;
+}
+
+message GetOrderRequest {
+  string id = 1;
+}
+
+// OrderService owns order placement and lookup.
+service OrderService {
+  rpc PlaceOrder(PlaceOrderRequest) returns (Order) {
+    option (google.api.http) = {
+      post: "/v1/orders"
+      body: "*"
+    };
+  }
+  rpc GetOrder(GetOrderRequest) returns (Order) {
+    option (google.api.http) = {get: "/v1/orders/{id}"};
+  }
+}

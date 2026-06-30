@@ -1,11 +1,17 @@
 version: v2
 modules:
   - path: proto
+deps:
+  - buf.build/googleapis/googleapis
 lint:
   use:
     - STANDARD
   except:
-    - PACKAGE_NO_IMPORT_CYCLE
+    # RPCs intentionally return the domain entity directly (GetProduct -> Product,
+    # PlaceOrder -> Order) per the design brief, rather than wrapping in
+    # *Response types. Disable the two rules that object to that.
+    - RPC_RESPONSE_STANDARD_NAME
+    - RPC_REQUEST_RESPONSE_UNIQUE
 breaking:
   use:
     - FILE
