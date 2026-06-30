@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package product.v1;
+
+// Product is a single catalog item owned by the product service.
+message Product {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int64 price_cents = 4;
+  int32 stock = 5;
+}

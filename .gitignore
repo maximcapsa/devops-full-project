@@ -1,0 +1,44 @@
+# Go
+/bin/
+*.exe
+*.test
+*.out
+vendor/
+
+# Env / secrets — never commit
+.env
+.env.*
+!.env.example
+*.tfvars
+!*.example.tfvars
+*.pem
+*.key
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+.terraform.lock.hcl
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Kubeconfig fetched locally
+kubeconfig
+*.kubeconfig
+
+# Local Claude personal instructions — not project content
+claude.md
+CLAUDE.md

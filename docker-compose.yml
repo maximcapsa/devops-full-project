@@ -1,0 +1,26 @@
+# Full local dev stack. Filled in phase by phase:
+#   Phase 2 adds postgres + product. Phase 4 adds redpanda + order.
+#   Phase 5 adds inventory/payment/notification. Phase 3/6 add bff + frontend.
+#
+# Usage: cp .env.example .env && make up
+name: ecommerce
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-ecommerce}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

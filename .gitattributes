@@ -1,0 +1,9 @@
+# Normalize line endings: code is LF in the repo regardless of OS.
+# Critical for shell scripts, Dockerfiles, and EC2 user-data (CRLF breaks them).
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
