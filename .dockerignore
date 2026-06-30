@@ -1,0 +1,12 @@
+.git
+.github
+bin
+infra
+deploy
+frontend/node_modules
+frontend/.next
+frontend/out
+**/*_test.go
+*.md
+claude.md
+CLAUDE.md

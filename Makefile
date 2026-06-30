@@ -31,6 +31,14 @@ tools: ## Install dev tooling (buf, golangci-lint, sqlc, migrate)
 proto: ## Generate Go from protobufs (buf generate)
 	$(BUF) generate
 
+.PHONY: sqlc
+sqlc: ## Generate type-safe DB code for every service (sqlc)
+	@for cfg in services/*/sqlc.yaml; do \
+		[ -f "$$cfg" ] || continue; \
+		dir=$$(dirname "$$cfg"); echo "sqlc generate ($$dir)"; \
+		( cd "$$dir" && sqlc generate ) || exit 1; \
+	done
+
 .PHONY: proto-lint
 proto-lint: ## Lint protobufs
 	$(BUF) lint

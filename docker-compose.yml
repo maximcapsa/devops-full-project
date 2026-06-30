@@ -22,5 +22,23 @@ services:
       timeout: 5s
       retries: 10
 
+  product:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: product
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-devpassword}@postgres:5432/${POSTGRES_DB:-ecommerce}?sslmode=disable
+      PRODUCT_GRPC_PORT: "50051"
+      PRODUCT_HTTP_PORT: "8081"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "50051:50051"
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:
