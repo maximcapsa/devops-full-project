@@ -40,7 +40,10 @@ message PaymentFailed {
 
 message StockReserved {
   string order_id = 1;
-  google.protobuf.Timestamp occurred_at = 2;
+  // Carried through from OrderPlaced so the payment service (which consumes
+  // StockReserved) can decide without re-reading the order.
+  int64 total_cents = 2;
+  google.protobuf.Timestamp occurred_at = 3;
 }
 
 message StockRejected {

@@ -1,6 +1,6 @@
-// Command order is the order-placement gRPC service. PlaceOrder prices the cart
-// via the product service, persists the order, and produces OrderPlaced to
-// Kafka. It runs its own migrations and exposes health probes.
+// Command notification consumes all saga events and records a notification per
+// (order, event type). It serves NotificationService so the UI can poll order
+// status.
 package main
 
 import (
@@ -17,11 +17,9 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	orderv1 "github.com/maximcapsa/devops-full-project/gen/order/v1"
-	productv1 "github.com/maximcapsa/devops-full-project/gen/product/v1"
+	notificationv1 "github.com/maximcapsa/devops-full-project/gen/notification/v1"
 	"github.com/maximcapsa/devops-full-project/pkg/config"
 	"github.com/maximcapsa/devops-full-project/pkg/events"
 	"github.com/maximcapsa/devops-full-project/pkg/grpcmw"
@@ -29,12 +27,12 @@ import (
 	"github.com/maximcapsa/devops-full-project/pkg/kafka"
 	applog "github.com/maximcapsa/devops-full-project/pkg/log"
 	"github.com/maximcapsa/devops-full-project/pkg/postgres"
-	"github.com/maximcapsa/devops-full-project/services/order/internal/consumer"
-	"github.com/maximcapsa/devops-full-project/services/order/internal/db"
-	"github.com/maximcapsa/devops-full-project/services/order/internal/server"
+	"github.com/maximcapsa/devops-full-project/services/notification/internal/consumer"
+	"github.com/maximcapsa/devops-full-project/services/notification/internal/db"
+	"github.com/maximcapsa/devops-full-project/services/notification/internal/server"
 )
 
-const schema = "orders"
+const schema = "notification"
 
 func main() {
 	log := applog.New(config.String("LOG_LEVEL", "info"))
@@ -53,7 +51,6 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	brokers := config.Strings("KAFKA_BROKERS", []string{"localhost:9092"})
-	productAddr := config.String("PRODUCT_GRPC_ADDR", "localhost:50051")
 
 	log.Info("running migrations", slog.String("schema", schema))
 	if err := postgres.Migrate(ctx, dbURL, db.MigrationsFS, "migrations", schema); err != nil {
@@ -65,40 +62,23 @@ func run(log *slog.Logger) error {
 	}
 	defer pool.Close()
 
-	// Kafka: ensure our topic exists (single broker => replication factor 1).
-	if err := kafka.EnsureTopics(ctx, brokers, 1, 1, events.TopicOrdersPlaced); err != nil {
-		return fmt.Errorf("ensure topics: %w", err)
+	topics := []string{
+		events.TopicOrdersPlaced,
+		events.TopicInventoryReserved,
+		events.TopicInventoryRejected,
+		events.TopicPaymentsCompleted,
+		events.TopicPaymentsFailed,
 	}
-	producer, err := kafka.NewProducer(brokers)
-	if err != nil {
-		return fmt.Errorf("kafka producer: %w", err)
-	}
-	defer producer.Close()
-
-	// Consumer that applies terminal status transitions from saga events.
-	statusCons, err := kafka.NewConsumer(brokers, "order-status",
-		events.TopicPaymentsCompleted, events.TopicPaymentsFailed, events.TopicInventoryRejected)
+	cons, err := kafka.NewConsumer(brokers, "notification", topics...)
 	if err != nil {
 		return fmt.Errorf("kafka consumer: %w", err)
 	}
-	defer statusCons.Close()
-
-	// Product gRPC client (for pricing).
-	productConn, err := grpc.NewClient(productAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithChainUnaryInterceptor(grpcmw.UnaryClientInterceptor()),
-	)
-	if err != nil {
-		return fmt.Errorf("dial product: %w", err)
-	}
-	defer func() { _ = productConn.Close() }()
-	productClient := productv1.NewProductServiceClient(productConn)
+	defer cons.Close()
 
 	// HTTP health.
 	h := health.New()
 	h.AddReadyCheck("postgres", pool.Ping)
-	h.AddReadyCheck("kafka", producer.Ping)
-	httpAddr := ":" + strconv.Itoa(config.Int("ORDER_HTTP_PORT", 8082))
+	httpAddr := ":" + strconv.Itoa(config.Int("NOTIFICATION_HTTP_PORT", 8085))
 	httpSrv := &http.Server{Addr: httpAddr, Handler: h.Mux(), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		log.Info("http listening", slog.String("addr", httpAddr))
@@ -109,23 +89,23 @@ func run(log *slog.Logger) error {
 
 	// gRPC.
 	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcmw.UnaryServerInterceptor(log)))
-	orderv1.RegisterOrderServiceServer(grpcServer, server.New(pool, productClient, producer, log))
+	notificationv1.RegisterNotificationServiceServer(grpcServer, server.New(pool, log))
 	reflection.Register(grpcServer)
-
-	grpcAddr := ":" + strconv.Itoa(config.Int("ORDER_GRPC_PORT", 50052))
+	grpcAddr := ":" + strconv.Itoa(config.Int("NOTIFICATION_GRPC_PORT", 50055))
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", grpcAddr, err)
 	}
+
 	errCh := make(chan error, 2)
 	go func() {
 		log.Info("grpc listening", slog.String("addr", grpcAddr))
 		errCh <- grpcServer.Serve(lis)
 	}()
-	statusHandler := consumer.NewStatusHandler(pool, log)
+	handler := consumer.New(pool, log)
 	go func() {
-		log.Info("consuming", slog.String("group", "order-status"))
-		errCh <- statusCons.Run(ctx, statusHandler.Handle)
+		log.Info("consuming", slog.Any("topics", topics), slog.String("group", "notification"))
+		errCh <- cons.Run(ctx, handler.Handle)
 	}()
 
 	select {

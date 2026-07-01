@@ -21,6 +21,8 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 
+	inventoryv1 "github.com/maximcapsa/devops-full-project/gen/inventory/v1"
+	notificationv1 "github.com/maximcapsa/devops-full-project/gen/notification/v1"
 	orderv1 "github.com/maximcapsa/devops-full-project/gen/order/v1"
 	productv1 "github.com/maximcapsa/devops-full-project/gen/product/v1"
 	"github.com/maximcapsa/devops-full-project/pkg/config"
@@ -43,6 +45,8 @@ func run(log *slog.Logger) error {
 
 	productAddr := config.String("PRODUCT_GRPC_ADDR", "localhost:50051")
 	orderAddr := config.String("ORDER_GRPC_ADDR", "localhost:50052")
+	inventoryAddr := config.String("INVENTORY_GRPC_ADDR", "localhost:50053")
+	notificationAddr := config.String("NOTIFICATION_GRPC_ADDR", "localhost:50055")
 	httpPort := config.Int("BFF_HTTP_PORT", 8080)
 	corsOrigin := config.String("CORS_ALLOW_ORIGIN", "*")
 
@@ -63,6 +67,18 @@ func run(log *slog.Logger) error {
 	}
 	defer func() { _ = orderConn.Close() }()
 
+	inventoryConn, err := grpc.NewClient(inventoryAddr, dialOpts...)
+	if err != nil {
+		return fmt.Errorf("dial inventory: %w", err)
+	}
+	defer func() { _ = inventoryConn.Close() }()
+
+	notificationConn, err := grpc.NewClient(notificationAddr, dialOpts...)
+	if err != nil {
+		return fmt.Errorf("dial notification: %w", err)
+	}
+	defer func() { _ = notificationConn.Close() }()
+
 	// REST<->gRPC gateway.
 	gwmux := runtime.NewServeMux()
 	if err := productv1.RegisterProductServiceHandler(ctx, gwmux, productConn); err != nil {
@@ -71,11 +87,19 @@ func run(log *slog.Logger) error {
 	if err := orderv1.RegisterOrderServiceHandler(ctx, gwmux, orderConn); err != nil {
 		return fmt.Errorf("register order handler: %w", err)
 	}
+	if err := inventoryv1.RegisterInventoryServiceHandler(ctx, gwmux, inventoryConn); err != nil {
+		return fmt.Errorf("register inventory handler: %w", err)
+	}
+	if err := notificationv1.RegisterNotificationServiceHandler(ctx, gwmux, notificationConn); err != nil {
+		return fmt.Errorf("register notification handler: %w", err)
+	}
 
 	// Health: readiness reflects upstream channel state.
 	h := health.New()
 	h.AddReadyCheck("product", connReady("product", productConn))
 	h.AddReadyCheck("order", connReady("order", orderConn))
+	h.AddReadyCheck("inventory", connReady("inventory", inventoryConn))
+	h.AddReadyCheck("notification", connReady("notification", notificationConn))
 
 	root := http.NewServeMux()
 	root.Handle("/healthz", h.Mux())

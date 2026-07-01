@@ -84,6 +84,65 @@ services:
       product:
         condition: service_started
 
+  inventory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: inventory
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-devpassword}@postgres:5432/${POSTGRES_DB:-ecommerce}?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+      INVENTORY_GRPC_PORT: "50053"
+      INVENTORY_HTTP_PORT: "8083"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "50053:50053"
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  payment:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: payment
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      PAYMENT_HTTP_PORT: "8084"
+      PAYMENT_LIMIT_CENTS: "1000000"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "8084:8084"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  notification:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: notification
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-devpassword}@postgres:5432/${POSTGRES_DB:-ecommerce}?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+      NOTIFICATION_GRPC_PORT: "50055"
+      NOTIFICATION_HTTP_PORT: "8085"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "50055:50055"
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
   bff:
     build:
       context: .
@@ -94,6 +153,8 @@ services:
       BFF_HTTP_PORT: "8080"
       PRODUCT_GRPC_ADDR: product:50051
       ORDER_GRPC_ADDR: order:50052
+      INVENTORY_GRPC_ADDR: inventory:50053
+      NOTIFICATION_GRPC_ADDR: notification:50055
       CORS_ALLOW_ORIGIN: "*"
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
@@ -101,6 +162,8 @@ services:
     depends_on:
       - product
       - order
+      - inventory
+      - notification
 
   frontend:
     image: node:20-alpine
