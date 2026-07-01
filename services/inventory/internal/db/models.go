@@ -15,6 +15,12 @@ type ProcessedOrder struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type Reservation struct {
+	OrderID   pgtype.UUID
+	ProductID pgtype.UUID
+	Quantity  int32
+}
+
 type Stock struct {
 	ProductID pgtype.UUID
 	Available int32

@@ -71,7 +71,8 @@ func run(log *slog.Logger) error {
 	}
 	defer producer.Close()
 
-	cons, err := kafka.NewConsumer(brokers, "inventory", events.TopicOrdersPlaced)
+	// payments.failed triggers the compensation that releases reserved stock.
+	cons, err := kafka.NewConsumer(brokers, "inventory", events.TopicOrdersPlaced, events.TopicPaymentsFailed)
 	if err != nil {
 		return fmt.Errorf("kafka consumer: %w", err)
 	}
@@ -108,8 +109,9 @@ func run(log *slog.Logger) error {
 	}()
 	handler := consumer.New(pool, producer, log)
 	go func() {
-		log.Info("consuming", slog.String("topic", events.TopicOrdersPlaced), slog.String("group", "inventory"))
-		errCh <- cons.Run(ctx, handler.HandleOrderPlaced)
+		log.Info("consuming", slog.String("group", "inventory"),
+			slog.Any("topics", []string{events.TopicOrdersPlaced, events.TopicPaymentsFailed}))
+		errCh <- cons.Run(ctx, handler.Handle)
 	}()
 
 	select {

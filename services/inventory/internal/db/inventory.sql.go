@@ -72,6 +72,84 @@ func (q *Queries) InsertProcessedOrder(ctx context.Context, arg InsertProcessedO
 	return err
 }
 
+const insertReservation = `-- name: InsertReservation :exec
+INSERT INTO reservations (order_id, product_id, quantity)
+VALUES ($1, $2, $3)
+`
+
+type InsertReservationParams struct {
+	OrderID   pgtype.UUID
+	ProductID pgtype.UUID
+	Quantity  int32
+}
+
+func (q *Queries) InsertReservation(ctx context.Context, arg InsertReservationParams) error {
+	_, err := q.db.Exec(ctx, insertReservation, arg.OrderID, arg.ProductID, arg.Quantity)
+	return err
+}
+
+const listReservations = `-- name: ListReservations :many
+SELECT product_id, quantity
+FROM reservations
+WHERE order_id = $1
+`
+
+type ListReservationsRow struct {
+	ProductID pgtype.UUID
+	Quantity  int32
+}
+
+func (q *Queries) ListReservations(ctx context.Context, orderID pgtype.UUID) ([]ListReservationsRow, error) {
+	rows, err := q.db.Query(ctx, listReservations, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListReservationsRow{}
+	for rows.Next() {
+		var i ListReservationsRow
+		if err := rows.Scan(&i.ProductID, &i.Quantity); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markOrderReleased = `-- name: MarkOrderReleased :execrows
+UPDATE processed_orders
+SET result = 'RELEASED'
+WHERE order_id = $1 AND result = 'RESERVED'
+`
+
+func (q *Queries) MarkOrderReleased(ctx context.Context, orderID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markOrderReleased, orderID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const releaseStock = `-- name: ReleaseStock :exec
+UPDATE stock
+SET available = available + $1,
+    reserved  = reserved - $1
+WHERE product_id = $2
+`
+
+type ReleaseStockParams struct {
+	Qty       int32
+	ProductID pgtype.UUID
+}
+
+func (q *Queries) ReleaseStock(ctx context.Context, arg ReleaseStockParams) error {
+	_, err := q.db.Exec(ctx, releaseStock, arg.Qty, arg.ProductID)
+	return err
+}
+
 const reserveStock = `-- name: ReserveStock :exec
 UPDATE stock
 SET available = available - $1,

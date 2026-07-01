@@ -40,10 +40,23 @@ func New(pool *pgxpool.Pool, producer *kafka.Producer, log *slog.Logger) *Handle
 	return &Handler{pool: pool, q: db.New(pool), producer: producer, log: log}
 }
 
-// HandleOrderPlaced is a kafka.Handler. It is idempotent: an order already in
-// processed_orders is not re-reserved, but its result is re-emitted (in case
-// the original emit was lost), and downstream consumers dedupe.
-func (h *Handler) HandleOrderPlaced(ctx context.Context, rec *kgo.Record) error {
+// Handle dispatches records by topic: OrderPlaced reserves stock,
+// PaymentFailed compensates by releasing the reservation.
+func (h *Handler) Handle(ctx context.Context, rec *kgo.Record) error {
+	switch rec.Topic {
+	case events.TopicOrdersPlaced:
+		return h.handleOrderPlaced(ctx, rec)
+	case events.TopicPaymentsFailed:
+		return h.handlePaymentFailed(ctx, rec)
+	default:
+		return nil
+	}
+}
+
+// handleOrderPlaced is idempotent: an order already in processed_orders is not
+// re-reserved, but its result is re-emitted (in case the original emit was
+// lost), and downstream consumers dedupe.
+func (h *Handler) handleOrderPlaced(ctx context.Context, rec *kgo.Record) error {
 	var evt eventsv1.OrderPlaced
 	if err := protojson.Unmarshal(rec.Value, &evt); err != nil {
 		// Poison message — log and skip rather than block the partition forever.
@@ -120,6 +133,12 @@ func (h *Handler) reserve(ctx context.Context, orderUUID uuid.UUID, evt *eventsv
 			if err := qtx.ReserveStock(ctx, db.ReserveStockParams{Qty: qty[pid], ProductID: pgUUID(u)}); err != nil {
 				return "", "", err
 			}
+			// Record the line so a PaymentFailed compensation can release it.
+			if err := qtx.InsertReservation(ctx, db.InsertReservationParams{
+				OrderID: pgUUID(orderUUID), ProductID: pgUUID(u), Quantity: qty[pid],
+			}); err != nil {
+				return "", "", err
+			}
 		}
 	}
 
@@ -146,6 +165,54 @@ func (h *Handler) emit(ctx context.Context, orderID string, total int64, result,
 	default:
 		return nil
 	}
+}
+
+// handlePaymentFailed compensates a failed payment by releasing the order's
+// reservation. Idempotent: MarkOrderReleased flips RESERVED -> RELEASED and
+// reports affected rows; 0 rows means already released (or never reserved),
+// so the stock update is skipped on redelivery.
+func (h *Handler) handlePaymentFailed(ctx context.Context, rec *kgo.Record) error {
+	var evt eventsv1.PaymentFailed
+	if err := protojson.Unmarshal(rec.Value, &evt); err != nil {
+		h.log.ErrorContext(ctx, "bad PaymentFailed payload", slog.Any("err", err))
+		return nil
+	}
+	orderUUID, err := uuid.Parse(evt.GetOrderId())
+	if err != nil {
+		h.log.ErrorContext(ctx, "bad order id in PaymentFailed", slog.String("order_id", evt.GetOrderId()))
+		return nil
+	}
+
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := h.q.WithTx(tx)
+
+	affected, err := qtx.MarkOrderReleased(ctx, pgUUID(orderUUID))
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return nil // already released, or the order was never reserved
+	}
+
+	lines, err := qtx.ListReservations(ctx, pgUUID(orderUUID))
+	if err != nil {
+		return err
+	}
+	for _, ln := range lines {
+		if err := qtx.ReleaseStock(ctx, db.ReleaseStockParams{Qty: ln.Quantity, ProductID: ln.ProductID}); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	h.log.InfoContext(ctx, "reservation released", slog.String("order_id", evt.GetOrderId()),
+		slog.Int("lines", len(lines)))
+	return nil
 }
 
 func pgUUID(u uuid.UUID) pgtype.UUID { return pgtype.UUID{Bytes: u, Valid: true} }
