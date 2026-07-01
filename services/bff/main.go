@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 
+	orderv1 "github.com/maximcapsa/devops-full-project/gen/order/v1"
 	productv1 "github.com/maximcapsa/devops-full-project/gen/product/v1"
 	"github.com/maximcapsa/devops-full-project/pkg/config"
 	"github.com/maximcapsa/devops-full-project/pkg/grpcmw"
@@ -41,6 +42,7 @@ func run(log *slog.Logger) error {
 	defer stop()
 
 	productAddr := config.String("PRODUCT_GRPC_ADDR", "localhost:50051")
+	orderAddr := config.String("ORDER_GRPC_ADDR", "localhost:50052")
 	httpPort := config.Int("BFF_HTTP_PORT", 8080)
 	corsOrigin := config.String("CORS_ALLOW_ORIGIN", "*")
 
@@ -55,15 +57,25 @@ func run(log *slog.Logger) error {
 	}
 	defer func() { _ = productConn.Close() }()
 
+	orderConn, err := grpc.NewClient(orderAddr, dialOpts...)
+	if err != nil {
+		return fmt.Errorf("dial order: %w", err)
+	}
+	defer func() { _ = orderConn.Close() }()
+
 	// REST<->gRPC gateway.
 	gwmux := runtime.NewServeMux()
 	if err := productv1.RegisterProductServiceHandler(ctx, gwmux, productConn); err != nil {
 		return fmt.Errorf("register product handler: %w", err)
 	}
+	if err := orderv1.RegisterOrderServiceHandler(ctx, gwmux, orderConn); err != nil {
+		return fmt.Errorf("register order handler: %w", err)
+	}
 
 	// Health: readiness reflects upstream channel state.
 	h := health.New()
-	h.AddReadyCheck("product", connReady(productConn))
+	h.AddReadyCheck("product", connReady("product", productConn))
+	h.AddReadyCheck("order", connReady("order", orderConn))
 
 	root := http.NewServeMux()
 	root.Handle("/healthz", h.Mux())
@@ -96,11 +108,11 @@ func run(log *slog.Logger) error {
 
 // connReady returns a readiness check that passes unless the channel is in a
 // failed/shutdown state (Idle/Connecting are fine — the client is lazy).
-func connReady(conn *grpc.ClientConn) health.CheckFunc {
+func connReady(name string, conn *grpc.ClientConn) health.CheckFunc {
 	return func(context.Context) error {
 		switch s := conn.GetState(); s {
 		case connectivity.TransientFailure, connectivity.Shutdown:
-			return fmt.Errorf("product channel %s", s)
+			return fmt.Errorf("%s channel %s", name, s)
 		default:
 			return nil
 		}

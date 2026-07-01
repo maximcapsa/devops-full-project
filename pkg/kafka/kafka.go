@@ -10,10 +10,38 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/maximcapsa/devops-full-project/pkg/retry"
 )
+
+// EnsureTopics creates the given topics if they do not exist. We create topics
+// explicitly (rather than relying on broker auto-create) so partition count and
+// replication factor are deterministic. Single broker => replication factor 1
+// (documented tradeoff). Already-existing topics are ignored.
+func EnsureTopics(ctx context.Context, brokers []string, partitions int32, replication int16, topics ...string) error {
+	cl, err := kgo.NewClient(kgo.SeedBrokers(brokers...))
+	if err != nil {
+		return fmt.Errorf("admin client: %w", err)
+	}
+	defer cl.Close()
+
+	adm := kadm.NewClient(cl)
+	return retry.Do(ctx, 8, 500*time.Millisecond, 5*time.Second, func() error {
+		resp, err := adm.CreateTopics(ctx, partitions, replication, nil, topics...)
+		if err != nil {
+			return err
+		}
+		for _, ct := range resp.Sorted() {
+			if ct.Err != nil && !errors.Is(ct.Err, kerr.TopicAlreadyExists) {
+				return fmt.Errorf("create topic %s: %w", ct.Topic, ct.Err)
+			}
+		}
+		return nil
+	})
+}
 
 // Producer publishes events synchronously with retry.
 type Producer struct {
