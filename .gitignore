@@ -14,12 +14,11 @@ vendor/
 *.pem
 *.key
 
-# Terraform
+# Terraform (.terraform.lock.hcl IS committed — it pins provider versions)
 **/.terraform/*
 *.tfstate
 *.tfstate.*
 crash.log
-.terraform.lock.hcl
 
 # Node / Next.js
 node_modules/

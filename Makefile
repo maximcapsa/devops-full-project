@@ -85,14 +85,24 @@ logs: ## Tail local stack logs
 ps: ## Show local stack status
 	$(COMPOSE) ps
 
-# ── Cloud (Terraform / Helm) — implemented in later phases ───────────────────
+# ── Cloud (Terraform / Helm) ─────────────────────────────────────────────────
+TF_DEV := terraform -chdir=infra/envs/dev
+
+.PHONY: infra-plan
+infra-plan: ## Terraform plan for envs/dev (needs dev.tfvars + bootstrapped backend)
+	$(TF_DEV) plan -var-file=dev.tfvars
+
+.PHONY: infra-apply
+infra-apply: ## Terraform apply for envs/dev — CREATES BILLABLE RESOURCES
+	$(TF_DEV) apply -var-file=dev.tfvars
+
 .PHONY: deploy
 deploy: ## Deploy to the k3s cluster via Helm (Phase 8+)
 	@echo "deploy: implemented in Phase 8/9"
 
 .PHONY: destroy
 destroy: ## Tear down ALL cloud infrastructure (terraform destroy)
-	@echo "destroy: implemented in Phase 7/10"
+	$(TF_DEV) destroy -var-file=dev.tfvars
 
 # ── CI aggregate ─────────────────────────────────────────────────────────────
 .PHONY: ci

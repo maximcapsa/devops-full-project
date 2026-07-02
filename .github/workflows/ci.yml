@@ -41,8 +41,16 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - name: terraform fmt
         run: terraform fmt -check -recursive infra
-        # validate runs in Phase 7 once modules exist
-        continue-on-error: true
+      - name: validate envs/dev
+        working-directory: infra/envs/dev
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: validate bootstrap
+        working-directory: infra/bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
 
   frontend:
     runs-on: ubuntu-latest
