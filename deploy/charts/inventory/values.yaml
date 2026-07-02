@@ -1,0 +1,39 @@
+# inventory: stock consumer + gRPC queries. Single replica: the consumer group
+# would rebalance fine with 2, but 1 partition means no parallelism gain.
+replicas: 1
+spread: false
+pdb:
+  enabled: false
+  minAvailable: 1
+
+image:
+  repository: ecommerce/inventory
+  tag: latest
+  pullPolicy: IfNotPresent
+
+ports:
+  http: 8083
+  grpc: 50053
+
+env:
+  INVENTORY_GRPC_PORT: "50053"
+  INVENTORY_HTTP_PORT: "8083"
+  KAFKA_BROKERS: "ecommerce-redpanda:9092"
+  LOG_LEVEL: "info"
+
+secretEnv:
+  - name: DATABASE_URL
+    secretName: ecommerce-postgres
+    secretKey: url
+
+probes:
+  livenessPath: /healthz
+  readinessPath: /readyz
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

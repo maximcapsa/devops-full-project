@@ -1,0 +1,36 @@
+# frontend: Next.js standalone server. Browser calls the API with relative
+# /v1/* URLs (NEXT_PUBLIC_BFF_URL="" baked at image build), so the Traefik
+# ingress serves storefront and API from the same origin — no CORS in prod.
+replicas: 1
+spread: false
+pdb:
+  enabled: false
+  minAvailable: 1
+
+image:
+  repository: ecommerce/frontend
+  tag: latest
+  pullPolicy: IfNotPresent
+
+ports:
+  http: 3000
+
+env:
+  PORT: "3000"
+  HOSTNAME: "0.0.0.0"
+  BFF_INTERNAL_URL: "http://ecommerce-bff:8080"
+
+secretEnv: []
+
+# Next.js has no /healthz; probing / is sufficient for a demo.
+probes:
+  livenessPath: /
+  readinessPath: /
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 300m
+    memory: 256Mi

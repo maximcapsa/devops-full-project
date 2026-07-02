@@ -1,0 +1,6 @@
+apiVersion: v2
+name: redpanda
+description: In-cluster single-node Redpanda, Kafka-API compatible (deliberate cost tradeoff vs MSK/dedicated EC2)
+type: application
+version: 0.1.0
+appVersion: "24.2.7"

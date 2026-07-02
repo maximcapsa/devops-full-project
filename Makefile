@@ -96,9 +96,24 @@ infra-plan: ## Terraform plan for envs/dev (needs dev.tfvars + bootstrapped back
 infra-apply: ## Terraform apply for envs/dev — CREATES BILLABLE RESOURCES
 	$(TF_DEV) apply -var-file=dev.tfvars
 
+HELM ?= helm
+
+.PHONY: charts
+charts: ## Re-stamp shared templates into every service chart
+	bash deploy/stamp-charts.sh
+
+.PHONY: helm-lint
+helm-lint: ## helm dependency update + lint + template the umbrella chart
+	$(HELM) dependency update deploy/charts/ecommerce
+	$(HELM) lint deploy/charts/ecommerce
+	$(HELM) template ecommerce deploy/charts/ecommerce > /dev/null
+	@echo "helm lint + template OK"
+
 .PHONY: deploy
-deploy: ## Deploy to the k3s cluster via Helm (Phase 8+)
-	@echo "deploy: implemented in Phase 8/9"
+deploy: ## Deploy the umbrella chart to the current kubectl context
+	$(HELM) dependency update deploy/charts/ecommerce
+	$(HELM) upgrade --install ecommerce deploy/charts/ecommerce \
+		--namespace ecommerce --create-namespace --wait --timeout 10m
 
 .PHONY: destroy
 destroy: ## Tear down ALL cloud infrastructure (terraform destroy)

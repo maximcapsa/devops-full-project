@@ -1,0 +1,21 @@
+# Single-node Redpanda (KRaft-style, no ZooKeeper) pinned to the server node,
+# like Postgres. Single broker => replication factor 1: a broker restart pauses
+# the pipeline briefly but loses nothing (data on the PVC); documented tradeoff.
+image:
+  repository: docker.redpanda.com/redpandadata/redpanda
+  tag: v24.2.7
+
+storage:
+  size: 5Gi
+  className: ""
+
+nodeSelector:
+  node-role.kubernetes.io/control-plane: "true"
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi

@@ -1,0 +1,29 @@
+# Single-node Postgres on a k3s local-path volume, pinned to the (on-demand)
+# server node so the spot-agent HA demo never takes the database with it.
+# Tradeoff vs RDS (saves ~$14/mo): no managed backups, data lives on one node.
+image:
+  repository: postgres
+  tag: 16-alpine
+
+auth:
+  username: app
+  # Override at install: --set postgres.auth.password=...
+  # (dev default; k8s Secret is created from this value, never committed real)
+  password: changeme-dev-only
+  database: ecommerce
+
+storage:
+  size: 5Gi
+  # k3s ships local-path as the default StorageClass; empty string uses it.
+  className: ""
+
+nodeSelector:
+  node-role.kubernetes.io/control-plane: "true"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

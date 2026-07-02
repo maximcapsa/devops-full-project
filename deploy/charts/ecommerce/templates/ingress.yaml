@@ -1,0 +1,31 @@
+{{- if .Values.ingress.enabled }}
+# Single-origin routing through k3s's built-in Traefik: /v1/* to the bff REST
+# API, everything else to the Next.js storefront. Same origin => the browser
+# needs no CORS and the frontend uses relative API URLs.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - http:
+        paths:
+          - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-bff
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-frontend
+                port:
+                  name: http
+{{- end }}

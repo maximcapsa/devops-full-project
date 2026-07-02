@@ -1,0 +1,6 @@
+apiVersion: v2
+name: postgres
+description: In-cluster single-node Postgres (deliberate cost tradeoff vs RDS)
+type: application
+version: 0.1.0
+appVersion: "16"

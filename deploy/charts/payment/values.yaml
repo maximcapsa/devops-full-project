@@ -1,0 +1,34 @@
+# payment: stateless payment simulator (Kafka consumer only).
+replicas: 1
+spread: false
+pdb:
+  enabled: false
+  minAvailable: 1
+
+image:
+  repository: ecommerce/payment
+  tag: latest
+  pullPolicy: IfNotPresent
+
+ports:
+  http: 8084
+
+env:
+  PAYMENT_HTTP_PORT: "8084"
+  PAYMENT_LIMIT_CENTS: "1000000"
+  KAFKA_BROKERS: "ecommerce-redpanda:9092"
+  LOG_LEVEL: "info"
+
+secretEnv: []
+
+probes:
+  livenessPath: /healthz
+  readinessPath: /readyz
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

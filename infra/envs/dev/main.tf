@@ -28,7 +28,8 @@ locals {
     Environment = "dev"
     ManagedBy   = "terraform"
   }
-  services = ["bff", "product", "order", "inventory", "payment", "notification"]
+  # frontend included: its Next.js image also ships from ECR to the cluster
+  services = ["bff", "product", "order", "inventory", "payment", "notification", "frontend"]
 }
 
 module "network" {

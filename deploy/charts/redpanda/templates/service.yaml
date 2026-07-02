@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-redpanda
+  labels:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: kafka
+    - name: admin
+      port: 9644
+      targetPort: admin

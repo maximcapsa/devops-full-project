@@ -1,0 +1,9 @@
+# Umbrella values. Per-service defaults live in each subchart's values.yaml;
+# override here (or with --set) per environment. CI sets image repositories to
+# the ECR URLs and the tag to the git SHA, e.g.:
+#   --set product.image.repository=<acct>.dkr.ecr.<region>.amazonaws.com/ecommerce-dev/product
+#   --set product.image.tag=<sha>
+
+ingress:
+  enabled: true
+  className: traefik

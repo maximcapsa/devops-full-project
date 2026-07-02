@@ -34,6 +34,9 @@ npm-debug.log*
 !.vscode/extensions.json
 *.swp
 
+# Helm packaged dependencies (rebuilt by `helm dependency update`)
+deploy/charts/ecommerce/charts/
+
 # Kubeconfig fetched locally
 kubeconfig
 *.kubeconfig

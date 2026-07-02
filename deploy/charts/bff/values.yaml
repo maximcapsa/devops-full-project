@@ -1,0 +1,38 @@
+# bff: REST gateway, must survive a node failure -> 2 replicas, spread, PDB.
+# Service DNS names assume the umbrella release is named "ecommerce".
+replicas: 2
+spread: true
+pdb:
+  enabled: true
+  minAvailable: 1
+
+image:
+  repository: ecommerce/bff # overridden with the ECR URL at deploy time
+  tag: latest
+  pullPolicy: IfNotPresent
+
+ports:
+  http: 8080
+
+env:
+  BFF_HTTP_PORT: "8080"
+  PRODUCT_GRPC_ADDR: "ecommerce-product:50051"
+  ORDER_GRPC_ADDR: "ecommerce-order:50052"
+  INVENTORY_GRPC_ADDR: "ecommerce-inventory:50053"
+  NOTIFICATION_GRPC_ADDR: "ecommerce-notification:50055"
+  CORS_ALLOW_ORIGIN: "*"
+  LOG_LEVEL: "info"
+
+secretEnv: []
+
+probes:
+  livenessPath: /healthz
+  readinessPath: /readyz
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

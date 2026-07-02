@@ -1,0 +1,30 @@
+dependencies:
+- name: postgres
+  repository: file://../postgres
+  version: 0.1.0
+- name: redpanda
+  repository: file://../redpanda
+  version: 0.1.0
+- name: product
+  repository: file://../product
+  version: 0.1.0
+- name: order
+  repository: file://../order
+  version: 0.1.0
+- name: inventory
+  repository: file://../inventory
+  version: 0.1.0
+- name: payment
+  repository: file://../payment
+  version: 0.1.0
+- name: notification
+  repository: file://../notification
+  version: 0.1.0
+- name: bff
+  repository: file://../bff
+  version: 0.1.0
+- name: frontend
+  repository: file://../frontend
+  version: 0.1.0
+digest: sha256:eab40edce29ca8875dcd3f071403bda1c3a19383bffe2f6321a489ecde9fc3a7
+generated: "2026-07-02T03:40:24.3026637+03:00"
